@@ -1,0 +1,85 @@
+name: build-fast-chunk
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout MAIN
+        uses: actions/checkout@v5
+
+      - name: Setup GHC and Cabal
+        uses: haskell-actions/setup@v2
+        with:
+          ghc-version: '9.6.5'
+          cabal-version: '3.12.1.0'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            libgmp-dev \
+            libffi-dev \
+            zlib1g-dev \
+            pkg-config \
+            libblst-dev
+
+      - name: Build MAIN
+        run: |
+          cabal update
+          cabal build exe:cardano-loans
+
+      - name: Assemble FAST chunk
+        run: |
+          set -eu
+
+          rm -rf release
+          mkdir -p release/cardano-loans-fast/bin
+
+          BIN="$(cabal list-bin exe:cardano-loans)"
+          cp "$BIN" release/cardano-loans-fast/bin/cardano-loans
+
+          cp bin/cardano-loans-fast \
+             release/cardano-loans-fast/bin/cardano-loans-fast
+
+          chmod +x release/cardano-loans-fast/bin/*
+
+          cat > release/cardano-loans-fast/install.sh <<'INSTALL'
+          #!/bin/sh
+          set -eu
+
+          ROOT="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+          PREFIX="${CARDANO_LOANS_PREFIX:-$HOME/.local/cardano-loans-fast}"
+
+          mkdir -p "$PREFIX/bin"
+
+          cp "$ROOT/bin/cardano-loans" "$PREFIX/bin/cardano-loans"
+          cp "$ROOT/bin/cardano-loans-fast" "$PREFIX/bin/cardano-loans-fast"
+
+          chmod +x "$PREFIX/bin/cardano-loans" \
+                    "$PREFIX/bin/cardano-loans-fast"
+
+          printf '%s\n' '{"chunk":"CARDANO_LOANS_FAST","status":"INSTALLED"}'
+          printf '%s\n' "{\"path\":\"$PREFIX\"}"
+          INSTALL
+
+          chmod +x release/cardano-loans-fast/install.sh
+
+          tar -czf \
+            cardano-loans-fast-linux-x86_64.tar.gz \
+            -C release \
+            cardano-loans-fast
+
+      - name: SHA256
+        run: |
+          sha256sum cardano-loans-fast-linux-x86_64.tar.gz
+
+      - name: Upload FAST chunk
+        uses: actions/upload-artifact@v4
+        with:
+          name: cardano-loans-fast-linux-x86_64
+          path: cardano-loans-fast-linux-x86_64.tar.gz

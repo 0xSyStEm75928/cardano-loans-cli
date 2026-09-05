@@ -1,0 +1,22 @@
+#!/bin/sh
+set -eu
+
+BIN="${CARDANO_LOANS_BIN:-cardano-loans}"
+CMD="${1:-}"
+
+case "$CMD" in
+  build|sign|submit|confirm)
+    shift
+    PHASE=$(printf '%s' "$CMD" | tr '[:lower:]' '[:upper:]')
+    printf '%s\n' "{\"phase\":\"$PHASE\",\"status\":\"RUNNING\"}"
+    if "$BIN" "$CMD" "$@" >/dev/null 2>&1; then
+      printf '%s\n' "{\"phase\":\"$PHASE\",\"status\":\"DONE\"}"
+    else
+      printf '%s\n' "{\"phase\":\"$PHASE\",\"status\":\"ERROR\"}"
+      exit 1
+    fi
+    ;;
+  *)
+    exec "$BIN" "$@"
+    ;;
+esac
