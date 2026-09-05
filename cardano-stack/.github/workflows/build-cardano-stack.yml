@@ -1,0 +1,78 @@
+name: build-cardano-stack
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout stack
+        uses: actions/checkout@v4
+
+      - name: Build cardano-node
+        uses: haskell-actions/setup@v2
+        with:
+          ghc-version: '9.6.7'
+          cabal-version: '3.12.1.0'
+
+      - name: System dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            pkg-config \
+            libblst-dev \
+            libgmp-dev \
+            libffi-dev \
+            zlib1g-dev
+
+      - name: Build node
+        working-directory: cardano-node
+        run: |
+          cabal update
+          cabal build exe:cardano-node exe:cardano-cli
+
+      - name: Locate node binaries
+        working-directory: cardano-node
+        run: |
+          mkdir -p ../artifacts
+          cp "$(cabal list-bin exe:cardano-node)" ../artifacts/cardano-node
+          cp "$(cabal list-bin exe:cardano-cli)" ../artifacts/cardano-cli
+          chmod +x ../artifacts/cardano-node ../artifacts/cardano-cli
+
+      - name: Build Ogmios
+        working-directory: ogmios
+        run: |
+          cabal update
+          cabal build ogmios
+
+      - name: Locate Ogmios
+        working-directory: ogmios
+        run: |
+          cp "$(cabal list-bin ogmios)" ../artifacts/ogmios
+          chmod +x ../artifacts/ogmios
+
+      - name: Build Kupo
+        working-directory: kupo
+        run: |
+          cabal update
+          cabal build kupo
+
+      - name: Locate Kupo
+        working-directory: kupo
+        run: |
+          cp "$(cabal list-bin kupo)" ../artifacts/kupo
+          chmod +x ../artifacts/kupo
+
+      - name: Verify artifacts
+        run: |
+          file artifacts/*
+          ls -lh artifacts/
+
+      - name: Upload Cardano stack
+        uses: actions/upload-artifact@v4
+        with:
+          name: cardano-stack-linux-x86_64
+          path: artifacts/
