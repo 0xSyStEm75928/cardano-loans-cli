@@ -1,0 +1,31 @@
+name: build-cardano-loans-cli
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: haskell-actions/setup@v2
+        with:
+          ghc-version: '9.6.5'
+          cabal-version: '3.12.1.0'
+
+      - name: Build
+        run: |
+          cabal update
+          cabal build exe:cardano-loans
+
+      - name: Locate binary
+        run: |
+          BIN="$(cabal list-bin exe:cardano-loans)"
+          cp "$BIN" cardano-loans-linux-x86_64
+          chmod +x cardano-loans-linux-x86_64
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cardano-loans-cli
+          path: cardano-loans-linux-x86_64
