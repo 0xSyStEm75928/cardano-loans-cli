@@ -26,6 +26,16 @@ jobs:
             libffi-dev \
             zlib1g-dev
 
+      - name: Verify blst pkg-config
+        run: |
+          echo '=== libblst-dev files ==='
+          dpkg -L libblst-dev | grep -E '(/pkgconfig/|\\.pc$)' || true
+          echo '=== blst pkg-config files ==='
+          find /usr -name '*.pc' -type f 2>/dev/null | grep -i blst || true
+          echo '=== pkg-config ==='
+          pkg-config --list-all | grep -i blst || true
+          pkg-config --modversion libblst-any || true
+
       - name: Configure pkg-config
         run: |
           export PKG_CONFIG_PATH="/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig:${PKG_CONFIG_PATH:-}"
