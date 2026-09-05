@@ -12,7 +12,7 @@ jobs:
 
       - uses: haskell-actions/setup@v2
         with:
-          ghc-version: '9.6.5'
+          ghc-version: '9.6.7'
           cabal-version: '3.12.1.0'
 
       - name: Install system dependencies
@@ -36,11 +36,18 @@ jobs:
           pkg-config --list-all | grep -i blst || true
           pkg-config --modversion libblst-any || true
 
-      - name: Configure pkg-config
+      - name: Configure blst
         run: |
           export PKG_CONFIG_PATH="/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig:${PKG_CONFIG_PATH:-}"
-          pkg-config --list-all | grep -i blst
-          echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH}" >> $GITHUB_ENV
+          echo "=== libblst-dev files ==="
+          dpkg -L libblst-dev | grep -E '(/pkgconfig/|\\.pc$)' || true
+          echo "=== blst pkg-config files ==="
+          find /usr -name '*.pc' -type f 2>/dev/null | grep -i blst || true
+          echo "=== pkg-config entries ==="
+          pkg-config --list-all | grep -i blst || true
+          echo "=== libblst-any ==="
+          pkg-config --modversion libblst-any || true
+          echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH" >> "$GITHUB_ENV"
 
       - name: Build
         run: |
