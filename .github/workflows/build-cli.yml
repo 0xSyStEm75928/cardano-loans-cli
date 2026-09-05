@@ -8,27 +8,42 @@ jobs:
     runs-on: ubuntu-24.04
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v4
 
       - uses: haskell-actions/setup@v2
         with:
           ghc-version: '9.6.5'
           cabal-version: '3.12.1.0'
 
-      - name: Build
+      - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libblst-dev pkg-config build-essential
+          sudo apt-get install -y \
+            libblst-dev \
+            pkg-config \
+            build-essential \
+            libgmp-dev \
+            libffi-dev \
+            zlib1g-dev
+
+      - name: Configure pkg-config
+        run: |
           export PKG_CONFIG_PATH="/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig:${PKG_CONFIG_PATH:-}"
+          pkg-config --list-all | grep -i blst
+          echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH}" >> $GITHUB_ENV
+
+      - name: Build
+        run: |
           cabal clean
           cabal update
-          cabal build exe:cardano-loans
+          cabal build exe:cardano-loans -v2
 
       - name: Locate binary
         run: |
           BIN="$(cabal list-bin exe:cardano-loans)"
           cp "$BIN" cardano-loans-linux-x86_64
           chmod +x cardano-loans-linux-x86_64
+          file cardano-loans-linux-x86_64
 
       - uses: actions/upload-artifact@v4
         with:
