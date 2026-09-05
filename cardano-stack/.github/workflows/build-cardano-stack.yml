@@ -8,70 +8,44 @@ jobs:
     runs-on: ubuntu-24.04
 
     steps:
-      - name: Checkout stack
+      - name: Checkout
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+
+      - name: Enable Cardano binary cache
+        run: |
+          sudo mkdir -p /etc/nix
+          printf '%s\n' \
+            'experimental-features = nix-command flakes' \
+            'substituters = https://cache.nixos.org https://cache.iog.io' \
+            'trusted-public-keys = hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ= cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShY=' \
+            | sudo tee /etc/nix/nix.conf
 
       - name: Build cardano-node
-        uses: haskell-actions/setup@v2
-        with:
-          ghc-version: '9.6.7'
-          cabal-version: '3.12.1.0'
-
-      - name: System dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            build-essential \
-            pkg-config \
-            libblst-dev \
-            libgmp-dev \
-            libffi-dev \
-            zlib1g-dev
-
-      - name: Build node
         working-directory: cardano-node
         run: |
-          cabal update
-          cabal build exe:cardano-node exe:cardano-cli
+          nix build .#cardano-node -o ../node-result
 
-      - name: Locate node binaries
+      - name: Build cardano-cli
         working-directory: cardano-node
         run: |
-          mkdir -p ../artifacts
-          cp "$(cabal list-bin exe:cardano-node)" ../artifacts/cardano-node
-          cp "$(cabal list-bin exe:cardano-cli)" ../artifacts/cardano-cli
-          chmod +x ../artifacts/cardano-node ../artifacts/cardano-cli
+          nix build .#cardano-cli -o ../cli-result
 
-      - name: Build Ogmios
-        working-directory: ogmios
+      - name: Collect artifacts
         run: |
-          cabal update
-          cabal build ogmios
-
-      - name: Locate Ogmios
-        working-directory: ogmios
-        run: |
-          cp "$(cabal list-bin ogmios)" ../artifacts/ogmios
-          chmod +x ../artifacts/ogmios
-
-      - name: Build Kupo
-        working-directory: kupo
-        run: |
-          cabal update
-          cabal build kupo
-
-      - name: Locate Kupo
-        working-directory: kupo
-        run: |
-          cp "$(cabal list-bin kupo)" ../artifacts/kupo
-          chmod +x ../artifacts/kupo
-
-      - name: Verify artifacts
-        run: |
+          mkdir -p artifacts
+          cp node-result/bin/cardano-node artifacts/cardano-node
+          cp cli-result/bin/cardano-cli artifacts/cardano-cli
+          chmod +x artifacts/*
           file artifacts/*
-          ls -lh artifacts/
+          ./artifacts/cardano-node --version
+          ./artifacts/cardano-cli --version
 
-      - name: Upload Cardano stack
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: cardano-stack-linux-x86_64
