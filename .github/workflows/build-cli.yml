@@ -6,6 +6,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-24.04
+
     steps:
       - uses: actions/checkout@v5
 
@@ -18,6 +19,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libblst-dev pkg-config
+          export PKG_CONFIG_PATH="/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig:${PKG_CONFIG_PATH:-}"
+          pkg-config --list-all | grep -i blst || true
           cabal update
           cabal build exe:cardano-loans
 
