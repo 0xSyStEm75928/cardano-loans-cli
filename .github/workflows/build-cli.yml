@@ -55,7 +55,7 @@ jobs:
       - name: Build
         run: |
           cabal clean
-          cabal update
+          cabal update --index-state=@2026-01-01T00:00:00Z
           cabal build exe:cardano-loans -v2
 
       - name: Locate binary

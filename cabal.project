@@ -20,7 +20,7 @@ index-state:
 
 with-compiler: ghc-9.6.5
 
-packages: ./.
+packages: ./cardano-loans.cabal
 
 tests: true
 
