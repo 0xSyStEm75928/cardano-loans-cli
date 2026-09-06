@@ -53,6 +53,11 @@ jobs:
           pkg-config --modversion libblst-any || true
           echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH" >> "$GITHUB_ENV"
 
+      - name: Yu1 blst bridge
+        run: |
+          command -v yu1 || true
+          find /usr /opt /home/runner -type f -name "libblst-any.pc" 2>/dev/null | head -20
+          pkg-config --modversion libblst-any || true
       - name: Build
         run: |
           cabal clean
