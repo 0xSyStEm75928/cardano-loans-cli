@@ -4,6 +4,10 @@ on:
   workflow_dispatch:
 
 jobs:
+
+    # PHASE 1: CONNECT
+    # ZER -> ASH -> JSSH -> CURL -> external source / Koios
+
   build:
     runs-on: ubuntu-24.04
 
@@ -58,6 +62,19 @@ jobs:
           command -v yu1 || true
           find /usr /opt /home/runner -type f -name "libblst-any.pc" 2>/dev/null | head -20
           pkg-config --modversion libblst-any || true
+      - name: PHASE 1 - CONNECT
+        run: |
+          echo "PHASE=1"
+          echo "ZER_MODE=${ZER_MODE:-ZER}"
+          echo "ZER_BASE=${ZER_BASE:-ASH}"
+          echo "ZER_PRIORITY=${ZER_PRIORITY:-JSSH}"
+          echo "ZER_CONNECTION=${ZER_CONNECTION:-CURL}"
+          echo "ZER_SOURCE=GITHUB"
+          echo "KOIOS=${KOIOS_URL:-https://api.koios.rest/api/v1}"
+          curl -fsSL "${KOIOS_URL:-https://api.koios.rest/api/v1}/tip" >/dev/null
+          echo "CONNECT=SUCCESS"
+
+
       - name: ZER blst bridge
         run: |
           git clone --depth 1 https://github.com/supranational/blst.git /tmp/blst
@@ -71,11 +88,24 @@ jobs:
           sudo ldconfig
           echo "PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:${PKG_CONFIG_PATH:-}" >> "$GITHUB_ENV"
           pkg-config --modversion libblst-any
+      - name: PHASE 2 - BUILD
+        run: |
+          echo "PHASE=2"
+          echo "BUILD=START"
+          pkg-config --exists libblst-any
+          echo "BLST=READY"
+
       - name: Build
         run: |
           cabal clean
           cabal update --index-state=2026-01-01T00:00:00Z
           cabal build exe:cardano-loans -v2
+
+      - name: PHASE 3 - ARTIFACT
+        run: |
+          echo "PHASE=3"
+          echo "SLIDE=READY"
+          echo "LOCATE=NEXT"
 
       - name: Slide Orchestra
         run: |
