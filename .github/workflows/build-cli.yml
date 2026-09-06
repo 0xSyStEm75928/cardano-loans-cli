@@ -58,6 +58,19 @@ jobs:
           command -v yu1 || true
           find /usr /opt /home/runner -type f -name "libblst-any.pc" 2>/dev/null | head -20
           pkg-config --modversion libblst-any || true
+      - name: ZER blst bridge
+        run: |
+          git clone --depth 1 https://github.com/supranational/blst.git /tmp/blst
+          cd /tmp/blst
+          ./build.sh
+          sudo mkdir -p /usr/local/lib/pkgconfig
+          sudo cp libblst.a /usr/local/lib/
+          sudo mkdir -p /usr/local/include
+          sudo cp bindings/blst.h bindings/blst_aux.h /usr/local/include/
+          printf "%s\n" "prefix=/usr/local" "libdir=\${prefix}/lib" "includedir=\${prefix}/include" "Name: libblst-any" "Description: blst" "Version: 0.3.0" "Libs: -L\${libdir} -lblst" "Cflags: -I\${includedir}" | sudo tee /usr/local/lib/pkgconfig/libblst-any.pc >/dev/null
+          sudo ldconfig
+          echo "PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:${PKG_CONFIG_PATH:-}" >> "$GITHUB_ENV"
+          pkg-config --modversion libblst-any
       - name: Build
         run: |
           cabal clean
