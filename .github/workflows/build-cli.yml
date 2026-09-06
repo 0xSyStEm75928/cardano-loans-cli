@@ -96,7 +96,13 @@ jobs:
           echo "BLST=READY"
 
       - name: Build
+        shell: bash
         run: |
+          set -e
+          export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig"
+          export PKG_CONFIG_LIBDIR="/usr/local/lib/pkgconfig:/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig"
+          pkg-config --modversion libblst-any
+          pkg-config --exists libblst-any
           cabal clean
           cabal update --index-state=2026-01-01T00:00:00Z
           cabal build exe:cardano-loans -v2
