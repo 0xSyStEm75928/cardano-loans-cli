@@ -14,6 +14,9 @@ jobs:
         with:
           ghc-version: '9.6.5'
           cabal-version: '3.12.1.0'
+ 
+      - name: Fix Cabal PATH
+        run: echo "/usr/local/.ghcup/bin" >> $GITHUB_PATH
 
       - name: Install system dependencies
         run: |
