@@ -64,6 +64,14 @@ jobs:
           cabal update --index-state=2026-01-01T00:00:00Z
           cabal build exe:cardano-loans -v2
 
+      - name: Slide Orchestra
+        run: |
+          BIN="$(cabal list-bin exe:cardano-loans)"
+          test -x "$BIN"
+          cp "$BIN" /tmp/cardano-loans-slide
+          chmod +x /tmp/cardano-loans-slide
+          echo "SLIDE_BINARY=/tmp/cardano-loans-slide"
+          file /tmp/cardano-loans-slide
       - name: Locate binary
         run: |
           BIN="$(cabal list-bin exe:cardano-loans)"
