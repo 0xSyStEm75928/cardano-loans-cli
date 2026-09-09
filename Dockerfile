@@ -6,7 +6,7 @@ RUN cabal update && cabal --version
 
 # Install system dependencies required by the build (matches
 # .github/workflows/build-cli.yml)
-RUN apt-get update \
+RUN apt-get update -o Acquire::Check-Valid-until=false \
     && apt-get install -y --no-install-recommends \
         pkg-config \
         build-essential \
@@ -60,7 +60,7 @@ RUN cabal build exe:cardano-loans -v2 \
 
 FROM debian:bullseye-slim AS runtime
 
-RUN apt-get update \
+RUN apt-get update -o Acquire::Check-Valid-until=false \
     && apt-get install -y --no-install-recommends \
         libgmp10 \
         libffi7 \
