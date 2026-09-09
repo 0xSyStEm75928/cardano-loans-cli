@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM haskell:9.6.5-slim-bullseye AS build
+FROM haskell:9.6.5-slim-buster AS build
 
 # Ensure cabal matches the version used by CI
 RUN cabal update && cabal --version
