@@ -48,13 +48,13 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-ghc-${{ steps.setup.outputs.ghc-version }}
           key: |
-            ${{ runner.os }}-ghc-${{ steps.setup.outputs.ghc-version }}-${{ hashFiles('cardano-loans-standalone.cabal') }}
+            ${{ runner.os }}-ghc-${{ steps.setup.outputs.ghc-version }}-${{ hashFiles('cabal.project', 'cardano-loans-standalone.cabal') }}
 
       - name: Install dependencies
         if: steps.cache.outputs.cache-hit != 'true'
         run: |
           cabal update
-          cabal build all --project-file=cardano-loans-standalone.cabal --only-dependencies
+          cabal build all --project-file=cabal.project --only-dependencies
 
       - name: Save dependency cache
         uses: actions/cache/save@v4
@@ -64,17 +64,17 @@ jobs:
           key: ${{ steps.cache.outputs.cache-primary-key }}
 
       - name: Build library
-        run: cabal build lib:cardano-loans-standalone --project-file=cardano-loans-standalone.cabal
+        run: cabal build lib:cardano-loans-standalone --project-file=cabal.project
 
       - name: Build executable
-        run: cabal build exe:cardano-loans --project-file=cardano-loans-standalone.cabal
+        run: cabal build exe:cardano-loans --project-file=cabal.project
 
       - name: Check cabal file
-        run: cabal check --project-file=cardano-loans-standalone.cabal
+        run: cabal check --project-file=cabal.project
 
       - name: Verify binary
         run: |
-          BIN="$(cabal list-bin exe:cardano-loans --project-file=cardano-loans-standalone.cabal)"
+          BIN="$(cabal list-bin exe:cardano-loans --project-file=cabal.project)"
           test -x "$BIN"
           "$BIN" --help || true
 

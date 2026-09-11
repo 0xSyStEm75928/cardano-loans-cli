@@ -38,14 +38,14 @@ jobs:
       - name: Build standalone CLI
         run: |
           cabal update
-          cabal build all --project-file=cardano-loans-standalone.cabal
+          cabal build all --project-file=cabal.project
 
       - name: Check cabal file
-        run: cabal check --project-file=cardano-loans-standalone.cabal
+        run: cabal check --project-file=cabal.project
 
       - name: Verify binary
         run: |
-          BIN="$(cabal list-bin exe:cardano-loans --project-file=cardano-loans-standalone.cabal)"
+          BIN="$(cabal list-bin exe:cardano-loans --project-file=cabal.project)"
           test -x "$BIN"
           "$BIN" --help || true
 
