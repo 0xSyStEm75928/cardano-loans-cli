@@ -1,18 +1,19 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveGeneric #-}
 
-module CardanoLoans.Standalone.Commands.Build where
+module CardanoLoans.Commands.Build
+  ( executeBuild
+  , BuildPhaseInput(..)
+  , BuildPhaseOutput(..)
+  ) where
 
-import Data.Aeson
+import Data.Aeson (Value(..), object, (.=))
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import qualified Data.ByteString.Char8 as BS
-import System.Process
-import System.Exit
-import GHC.Generics
-import CardanoLoans.Standalone.Types
-import CardanoLoans.Standalone.Config
+import CardanoLoans.Types
+import CardanoLoans.Config
 
 -- ============================================================================
 -- Build Command Implementation

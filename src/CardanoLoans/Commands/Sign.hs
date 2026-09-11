@@ -1,20 +1,21 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveGeneric #-}
 
-module CardanoLoans.Standalone.Commands.Sign where
+module CardanoLoans.Commands.Sign
+  ( executeSign
+  , SignPhaseInput(..)
+  , SignPhaseOutput(..)
+  ) where
 
-import Data.Aeson
+import Data.Aeson (Value(..), object, (.=))
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import qualified Data.ByteString.Char8 as BS
-import System.Process
-import System.Exit
 import System.Environment (getEnv)
 import Control.Exception (catch, SomeException)
-import GHC.Generics
-import CardanoLoans.Standalone.Types
-import CardanoLoans.Standalone.Config
+import CardanoLoans.Types
+import CardanoLoans.Config
 
 -- ============================================================================
 -- Sign Command Implementation

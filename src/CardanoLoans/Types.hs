@@ -1,263 +1,290 @@
-{-# LANGUAGE DerivingStrategies #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE StrictData #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE ViewPatterns #-}
 
 module CardanoLoans.Types
-  ( NegotiationBeaconId(..)
-  , ActiveBeaconId(..)
-  , Fraction(..)
-  , Penalty(..)
-  , Asset(..)
-  , LenderId(..)
-  , BorrowerId(..)
-  , LoanId(..)
-  , AssetBeacon(..)
-  , Collateralization(..)
-  , Collateral(..)
-  , LenderAddress(..)
+  ( -- * Loan Request Types
+    LoanRequest(..)
+    -- * Transaction Types
+  , TransactionBody(..)
+  , SignedTransaction(..)
+    -- * Command Results
+  , CommandResult(..)
+  , Status(..)
+    -- * Network Types
+  , NetworkType(..)
+    -- * Build Phase Types
+  , BuildPhaseInput(..)
+  , BuildPhaseOutput(..)
+    -- * Sign Phase Types
+  , SignPhaseInput(..)
+  , SignPhaseOutput(..)
+    -- * Submit Phase Types
+  , SubmitPhaseInput(..)
+  , SubmitPhaseOutput(..)
+    -- * Status/Confirm Phase Types
+  , ConfirmPhaseInput(..)
+  , ConfirmPhaseOutput(..)
+  , ConfirmStatus(..)
+    -- * Error Types
+  , LoanError(..)
   ) where
 
-import Data.Bifunctor (bimap)
 import Data.Aeson
-import Data.Text qualified as T
-import Prettyprinter
+import Data.Text (Text)
+import GHC.Generics
+import Data.Maybe (catMaybes)
 
-import qualified PlutusLedgerApi.V2 as PV2
-import qualified PlutusTx
+-- ============================================================================
+-- Loan Request Types
+-- ============================================================================
 
--------------------------------------------------
--- On-Chain Data Types
--------------------------------------------------
--- | A wrapper around the policy id for the negotation beacon script.
-newtype NegotiationBeaconId = NegotiationBeaconId { _unNegotiationBeaconId :: PV2.CurrencySymbol }
-  deriving (Show,Eq)
-  deriving newtype (PV2.ToData,PV2.FromData,PV2.UnsafeFromData)
+data LoanRequest = LoanRequest
+  { principal :: Integer       -- ^ Principal amount in lovelace
+  , termDays :: Int            -- ^ Loan term in days
+  , collateral :: [Text]       -- ^ Collateral asset IDs (empty for unsecured)
+  , borrowerAddress :: Text    -- ^ Borrower's Cardano address
+  , lenderAddress :: Text      -- ^ Lender's Cardano address
+  , interestRate :: Double     -- ^ Interest rate as percentage
+  } deriving (Show, Generic)
 
-instance ToJSON NegotiationBeaconId where
-  toJSON (NegotiationBeaconId currSym) = toJSON $ T.pack $ show currSym
+instance FromJSON LoanRequest
+instance ToJSON LoanRequest
 
--- | A wrapper around the policy id for the active beacon script.
-newtype ActiveBeaconId = ActiveBeaconId { _unActiveBeaconId :: PV2.CurrencySymbol }
-  deriving (Show,Eq)
-  deriving newtype (PV2.ToData,PV2.FromData,PV2.UnsafeFromData)
+-- ============================================================================
+-- Transaction Types
+-- ============================================================================
 
-instance ToJSON ActiveBeaconId where
-  toJSON (ActiveBeaconId currSym) = toJSON $ T.pack $ show currSym
+data TransactionBody = TransactionBody
+  { txBodyHex :: Text          -- ^ Hex-encoded transaction body
+  , txHash :: Text             -- ^ Transaction hash
+  , txFee :: Integer           -- ^ Transaction fee in lovelace
+  } deriving (Show, Generic)
 
--- | A wrapper around two integers that make up a fraction. This is used
--- in the absence of a decimal type on change.
-newtype Fraction = Fraction { _unFraction :: (Integer,Integer) }
-  deriving (Show,Eq)
+instance FromJSON TransactionBody
+instance ToJSON TransactionBody
 
-instance Ord Fraction where
-  (Fraction (num1,den1)) <= (Fraction (num2,den2)) = num1 * den2 <= num2 * den1
+data SignedTransaction = SignedTransaction
+  { signedTxHex :: Text        -- ^ Hex-encoded signed transaction
+  , signatureCount :: Int      -- ^ Number of signatures
+  } deriving (Show, Generic)
 
-instance PV2.ToData Fraction where
-  toBuiltinData (Fraction (num,den)) = 
-    PV2.BuiltinData $ PV2.List [PV2.toData num, PV2.toData den]
+instance FromJSON SignedTransaction
+instance ToJSON SignedTransaction
 
-instance PV2.FromData Fraction where
-  fromBuiltinData (PV2.BuiltinData (PV2.List [num,den])) =
-    fmap Fraction . (,) 
-      <$> PV2.fromData num 
-      <*> PV2.fromData den
-  fromBuiltinData _ = Nothing
+-- ============================================================================
+-- Command Results
+-- ============================================================================
 
-instance PV2.UnsafeFromData Fraction where
-  unsafeFromBuiltinData (PV2.BuiltinData (PV2.List [num,den])) = 
-    Fraction (unsafeFromData num, unsafeFromData den)
-  unsafeFromBuiltinData _ = error "Could not convert Data to Fraction"
+data CommandResult = CommandResult
+  { command :: Text            -- ^ Command name (build, sign, submit, status, confirm)
+  , phase :: Text              -- ^ Phase name (BUILD, SIGN, SUBMIT, CONFIRMED)
+  , status :: Status           -- ^ success or error
+  , txId :: Maybe Text         -- ^ Transaction ID (only after SUBMIT)
+  , block :: Maybe Integer     -- ^ Block height (only after CONFIRMED)
+  , timestamp :: Maybe Text    -- ^ ISO 8601 timestamp
+  , errorMsg :: Maybe Text     -- ^ Error message if status = error
+  , data_ :: Maybe Object      -- ^ Additional data (arbitrary JSON object)
+  } deriving (Show, Generic)
 
-instance ToJSON Fraction where
-  toJSON (Fraction (num,den)) =
-    object [ "numerator" .= T.pack (show num)
-           , "denominator" .= T.pack (show den)
-           ]
+instance FromJSON CommandResult where
+  parseJSON = withObject "CommandResult" $ \v -> CommandResult
+    <$> v .: "command"
+    <*> v .: "phase"
+    <*> v .: "status"
+    <*> v .:? "txid"
+    <*> v .:? "block"
+    <*> v .:? "timestamp"
+    <*> v .:? "error"
+    <*> v .:? "data"
 
-instance Pretty Fraction where
-  pretty (Fraction (num,den)) = 
-    pretty num <+> "/" <+> pretty den <+> 
-      tupled [pretty ceilingResult]
+instance ToJSON CommandResult where
+  toJSON CommandResult{..} = object $
+    [ "command" .= command
+    , "phase" .= phase
+    , "status" .= status
+    ] ++ catMaybes
+    [ ("txid" .=) <$> txId
+    , ("block" .=) <$> block
+    , ("timestamp" .=) <$> timestamp
+    , ("error" .=) <$> errorMsg
+    , ("data" .=) <$> data_
+    ]
+
+data Status = Success | Error
+  deriving (Show, Generic, Eq)
+
+instance FromJSON Status where
+  parseJSON (String "success") = pure Success
+  parseJSON (String "error") = pure Error
+  parseJSON _ = fail "Invalid status"
+
+instance ToJSON Status where
+  toJSON Success = String "success"
+  toJSON Error = String "error"
+
+-- ============================================================================
+-- Network Types
+-- ============================================================================
+
+data NetworkType = Testnet | Mainnet
+  deriving (Show, Generic, Eq)
+
+instance FromJSON NetworkType where
+  parseJSON (String "testnet") = pure Testnet
+  parseJSON (String "mainnet") = pure Mainnet
+  parseJSON _ = fail "Invalid network"
+
+instance ToJSON NetworkType where
+  toJSON Testnet = String "testnet"
+  toJSON Mainnet = String "mainnet"
+
+-- ============================================================================
+-- Build Phase Types
+-- ============================================================================
+
+data BuildPhaseInput = BuildPhaseInput
+  { bpiPrincipal :: Integer
+  , bpiTermDays :: Int
+  , bpiCollateral :: [Text]
+  , bpiBorrowerAddress :: Text
+  , bpiLenderAddress :: Text
+  , bpiInterestRate :: Double
+  , bpiConfigFile :: FilePath
+  } deriving (Show)
+
+data BuildPhaseOutput = BuildPhaseOutput
+  { bpoTxBodyHex :: Text
+  , bpoTxHash :: Text
+  , bpoFee :: Integer
+  } deriving (Show, Generic)
+
+instance ToJSON BuildPhaseOutput where
+  toJSON BuildPhaseOutput{..} = object
+    [ "txBody" .= bpoTxBodyHex
+    , "txHash" .= bpoTxHash
+    , "fee" .= bpoFee
+    ]
+
+-- ============================================================================
+-- Sign Phase Types
+-- ============================================================================
+
+data SignPhaseInput = SignPhaseInput
+  { spiTxBodyHex :: Text           -- ^ Hex-encoded unsigned transaction body
+  , spiSigningMechanism :: Text    -- ^ Signing mechanism (cardano-cli, external, hardware-wallet)
+  , spiSigningKeysPath :: Text     -- ^ Path or key derivation path for signing keys
+  , spiConfigFile :: FilePath     -- ^ Path to configuration file
+  } deriving (Show)
+
+data SignPhaseOutput = SignPhaseOutput
+  { spoSignature :: Text           -- ^ Hex-encoded transaction witness
+  , spoSigningMechanism :: Text    -- ^ Mechanism used for signing
+  , spoStatus :: Text              -- ^ Status (signed)
+  } deriving (Show, Generic)
+
+instance ToJSON SignPhaseOutput where
+  toJSON SignPhaseOutput{..} = object
+    [ "signature" .= spoSignature
+    , "mechanism" .= spoSigningMechanism
+    , "signed" .= spoStatus
+    ]
+
+-- ============================================================================
+-- Submit Phase Types
+-- ============================================================================
+
+data SubmitPhaseInput = SubmitPhaseInput
+  { spSignedTxHex :: Text      -- ^ Hex-encoded signed transaction
+  , spNetworkId :: Text         -- ^ Network ID (mainnet, testnet, preview)
+  , spConfigFile :: FilePath   -- ^ Path to configuration file
+  } deriving (Show)
+
+data SubmitPhaseOutput = SubmitPhaseOutput
+  { spoTxId :: Text             -- ^ Transaction ID after submission
+  , spoNetworkId :: Text        -- ^ Network the tx was submitted to
+  , spoStatus :: Text           -- ^ Submission status
+  , spoConfirmationUrl :: Text  -- ^ URL to view the transaction on an explorer
+  } deriving (Show, Generic)
+
+instance ToJSON SubmitPhaseOutput where
+  toJSON SubmitPhaseOutput{..} = object
+    [ "txid" .= spoTxId
+    , "network" .= spoNetworkId
+    , "status" .= spoStatus
+    , "explorer_url" .= spoConfirmationUrl
+    ]
+
+-- ============================================================================
+-- Status/Confirm Phase Types
+-- ============================================================================
+
+data ConfirmPhaseInput = ConfirmPhaseInput
+  { cpiTxId :: Text
+  , cpiConfigFile :: FilePath
+  } deriving (Show)
+
+data ConfirmPhaseOutput = ConfirmPhaseOutput
+  { cpoTxId :: Text
+  , cpoStatus :: ConfirmStatus
+  , cpoBlock :: Maybe Integer
+  , cpoTimestamp :: Maybe Text
+  } deriving (Show, Generic)
+
+data ConfirmStatus = Pending | Confirmed | Failed
+  deriving (Show, Generic, Eq)
+
+instance FromJSON ConfirmStatus where
+  parseJSON (String "pending") = pure Pending
+  parseJSON (String "confirmed") = pure Confirmed
+  parseJSON (String "failed") = pure Failed
+  parseJSON _ = fail "Invalid confirm status"
+
+instance ToJSON ConfirmStatus where
+  toJSON Pending = String "pending"
+  toJSON Confirmed = String "confirmed"
+  toJSON Failed = String "failed"
+
+instance ToJSON ConfirmPhaseOutput where
+  toJSON ConfirmPhaseOutput{..} = object $
+    [ "txid" .= cpoTxId
+    , "status" .= cpoStatus
+    ] ++ catMaybes
+    [ ("block" .=) <$> cpoBlock
+    , ("timestamp" .=) <$> cpoTimestamp
+    ]
+
+-- ============================================================================
+-- Error Types
+-- ============================================================================
+
+data LoanError
+  = ConfigError String
+  | BuildError String
+  | SignError String
+  | SubmitError String
+  | StatusError String
+  | NetworkError String
+  | ValidationError String
+  deriving (Show)
+
+instance ToJSON LoanError where
+  toJSON err = object
+    [ "error_type" .= errorType err
+    , "message" .= errorMessage err
+    ]
     where
-      -- Must always round up since you can't pay 1.2 Lovelace.
-      ceilingResult = (num + den - 1) `div` den
+      errorType ConfigError{} = String "config_error"
+      errorType BuildError{} = String "build_error"
+      errorType SignError{} = String "sign_error"
+      errorType SubmitError{} = String "submit_error"
+      errorType StatusError{} = String "status_error"
+      errorType NetworkError{} = String "network_error"
+      errorType ValidationError{} = String "validation_error"
 
--- | The penalty to apply whenever the minimum payment is not met.
-data Penalty
-  = NoPenalty
-  | FixedFee Integer
-  | PercentFee Fraction
-  deriving (Show,Eq)
-
-instance ToJSON Penalty where
-  toJSON NoPenalty = "none"
-  toJSON (FixedFee fee) = object [ "fixed_fee" .= fee ]
-  toJSON (PercentFee fee) = object [ "percent_fee" .= toJSON fee ]
-
--- | A wrapper around an asset's full name (policy id, token name). It uses
--- a custom data encoding since Aiken uses a different encoding for it.
-newtype Asset = Asset { _unAsset :: (PV2.CurrencySymbol,PV2.TokenName) }
-  deriving (Show,Eq)
-
-instance PV2.ToData Asset where
-  toBuiltinData (Asset (sym,name)) = 
-    PV2.BuiltinData $ PV2.List [PV2.toData sym, PV2.toData name]
-
-instance PV2.FromData Asset where
-  fromBuiltinData (PV2.BuiltinData (PV2.List [sym,name])) =
-    fmap Asset . (,) 
-      <$> PV2.fromData sym 
-      <*> PV2.fromData name
-  fromBuiltinData _ = Nothing
-
-instance PV2.UnsafeFromData Asset where
-  unsafeFromBuiltinData (PV2.BuiltinData (PV2.List [sym,name])) = 
-    Asset (unsafeFromData sym, unsafeFromData name)
-  unsafeFromBuiltinData _ = error "Could not convert Data to Asset"
-
-instance ToJSON Asset where
-  toJSON (Asset (currSym,PV2.TokenName tokName)) =
-    object [ "policy_id" .= T.pack (show currSym)
-           , "asset_name" .= T.pack (show $ PV2.PubKeyHash tokName)
-           ]
-
-instance Pretty Asset where
-  pretty (Asset (currSym,PV2.TokenName tokName)) = 
-    if currSym == "" 
-    then "lovelace"
-    else pretty $ T.pack (show currSym) <> "." <> T.pack (show $ PV2.PubKeyHash tokName)
-
--- | A wrapper around the token name for a lender id. It is prefixed with
--- either "00" or "01" depending on whether the lender's credential is a pub key credential
--- or a script credential, respectively.
-newtype LenderId = LenderId { _unLenderId :: PV2.TokenName }
-  deriving (Show,Eq)
-  deriving newtype (PV2.ToData,PV2.FromData,PV2.UnsafeFromData)
-
-instance ToJSON LenderId where
-  toJSON (LenderId (PV2.TokenName tokName)) = toJSON $ T.pack $ show $ PV2.PubKeyHash tokName 
-
-instance Pretty LenderId where
-  pretty (LenderId (PV2.TokenName tokName)) = pretty $ T.pack $ show $ PV2.PubKeyHash tokName
-
--- | A wrapper around the token name for a borrower id.
-newtype BorrowerId = BorrowerId { _unBorrowerId :: PV2.TokenName }
-  deriving (Show,Eq)
-  deriving newtype (PV2.ToData,PV2.FromData,PV2.UnsafeFromData)
-
-instance ToJSON BorrowerId where
-  toJSON (BorrowerId (PV2.TokenName tokName)) = toJSON $ T.pack $ show $ PV2.PubKeyHash tokName 
-
-instance Pretty BorrowerId where
-  pretty (BorrowerId (PV2.TokenName tokName)) = pretty $ T.pack $ show $ PV2.PubKeyHash tokName
-
--- | A wrapper around the token name for a loan asset's beacon name. The name is:
--- sha2_256 ( "Asset" ++ policy id ++ token name ).
-newtype AssetBeacon = AssetBeacon { _unAssetBeacon :: PV2.TokenName }
-  deriving (Show,Eq)
-  deriving newtype (PV2.ToData,PV2.FromData,PV2.UnsafeFromData)
-
-instance ToJSON AssetBeacon where
-  toJSON (AssetBeacon (PV2.TokenName tokName)) = toJSON $ T.pack $ show $ PV2.PubKeyHash tokName 
-
-instance Pretty AssetBeacon where
-  pretty (AssetBeacon (PV2.TokenName tokName)) = pretty $ T.pack $ show $ PV2.PubKeyHash tokName 
-
--- | A wrapper around the token name for a loan's unique identifier. The name is:
--- sha2_256 ( offer tx hash ++ offer output index ).
-newtype LoanId = LoanId { _unLoanId :: PV2.TokenName }
-  deriving (Show,Eq)
-  deriving newtype (PV2.ToData,PV2.FromData,PV2.UnsafeFromData)
-
-instance ToJSON LoanId where
-  toJSON (LoanId (PV2.TokenName tokName)) = toJSON $ T.pack $ show $ PV2.PubKeyHash tokName 
-
-instance Pretty LoanId where
-  pretty (LoanId (PV2.TokenName tokName)) = pretty $ T.pack $ show $ PV2.PubKeyHash tokName 
-
--- | A wrapper around a list of collateral and their values relative to the loan asset. It uses
--- a custom data encoding since Aiken uses a different encoding for it.
-newtype Collateralization = Collateralization { _unCollateralization :: [(Asset,Fraction)] }
-  deriving (Show,Eq)
-
-instance PV2.ToData Collateralization where
-  toBuiltinData (Collateralization xs) = 
-    PV2.BuiltinData $ PV2.Map $ map (bimap PV2.toData PV2.toData) xs
-
-instance PV2.FromData Collateralization where
-  fromBuiltinData (PV2.BuiltinData (PV2.Map collats)) = 
-    fmap Collateralization $ sequence $ 
-        flip map collats $ \(x,y) -> (,) <$> PV2.fromData x <*> PV2.fromData y
-  fromBuiltinData _ = Nothing
-
-instance PV2.UnsafeFromData Collateralization where
-  unsafeFromBuiltinData (PV2.BuiltinData (PV2.Map collats)) = 
-    Collateralization $ map (bimap unsafeFromData unsafeFromData) collats
-  unsafeFromBuiltinData _ = error "Could not convert Data to Collateralization"
-
-instance ToJSON Collateralization where
-  toJSON (Collateralization xs) = object [ "collateralization" .= map toJSON xs ]
-
--- | A wrapper around a list of collateral. It uses a custom data encoding since Aiken uses a 
--- different encoding for it.
-newtype Collateral = Collateral { _unCollateral :: [Asset] }
-  deriving (Show,Eq)
-
-instance PV2.ToData Collateral where
-  toBuiltinData (Collateral xs) = 
-    PV2.BuiltinData $ PV2.Map $ map (bimap PV2.toData PV2.toData . _unAsset) xs
-
-instance PV2.FromData Collateral where
-  fromBuiltinData (PV2.BuiltinData (PV2.Map collats)) = 
-    fmap Collateral $ sequence $ 
-        flip map collats $ \(x,y) -> fmap Asset . (,) <$> PV2.fromData x <*> PV2.fromData y
-  fromBuiltinData _ = Nothing
-
-instance PV2.UnsafeFromData Collateral where
-  unsafeFromBuiltinData (PV2.BuiltinData (PV2.Map collats)) = 
-    Collateral $ map (Asset . bimap unsafeFromData unsafeFromData) collats
-  unsafeFromBuiltinData _ = error "Could not convert Data to Collateral"
-
-instance ToJSON Collateral where
-  toJSON (Collateral xs) = object [ "collateral" .= map toJSON xs ]
-
-newtype LenderAddress = LenderAddress { _unLenderAddress :: PV2.Address }
-  deriving (Show,Eq)
-
-instance ToJSON LenderAddress where
-  toJSON (LenderAddress (PV2.Address paymentCred mStakeCred)) = 
-    object [ "payment_pub_key_hash" .= fmap show (toPaymentPubKeyHash paymentCred)
-           , "payment_script_hash" .= fmap show (toPaymentScriptHash paymentCred)
-           , "stake_pub_key_hash" .= fmap show (toStakePubKeyHash mStakeCred)
-           , "stake_script_hash" .= fmap show (toStakeScriptHash mStakeCred)
-           ]
-
--------------------------------------------------
--- Helpers
--------------------------------------------------
-unsafeFromData :: (PV2.UnsafeFromData a) => PV2.Data -> a
-unsafeFromData = PV2.unsafeFromBuiltinData . PV2.dataToBuiltinData
-
-toPaymentPubKeyHash :: PV2.Credential -> Maybe PV2.PubKeyHash
-toPaymentPubKeyHash (PV2.PubKeyCredential k) = Just k
-toPaymentPubKeyHash _ = Nothing
-
-toPaymentScriptHash :: PV2.Credential -> Maybe PV2.ScriptHash
-toPaymentScriptHash (PV2.ScriptCredential k) = Just k
-toPaymentScriptHash _ = Nothing
-
-toStakePubKeyHash :: Maybe PV2.StakingCredential -> Maybe PV2.PubKeyHash
-toStakePubKeyHash (Just (PV2.StakingHash (PV2.PubKeyCredential pkh))) = Just pkh
-toStakePubKeyHash _ = Nothing
-
-toStakeScriptHash :: Maybe PV2.StakingCredential -> Maybe PV2.ScriptHash
-toStakeScriptHash (Just (PV2.StakingHash (PV2.ScriptCredential k))) = Just k
-toStakeScriptHash _ = Nothing
-
--------------------------------------------------
--- TemplateHaskell
--------------------------------------------------
-PlutusTx.unstableMakeIsData ''Penalty
+      errorMessage (ConfigError msg) = msg
+      errorMessage (BuildError msg) = msg
+      errorMessage (SignError msg) = msg
+      errorMessage (SubmitError msg) = msg
+      errorMessage (StatusError msg) = msg
+      errorMessage (NetworkError msg) = msg
+      errorMessage (ValidationError msg) = msg

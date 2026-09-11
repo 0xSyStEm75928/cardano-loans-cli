@@ -1,7 +1,23 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 
-module CardanoLoans.Standalone.Config where
+module CardanoLoans.Config
+  ( Config(..)
+  , NetworkMode(..)
+  , ProtocolParams(..)
+  , defaultProtocolParams
+  , defaultConfig
+  , loadConfig
+  , loadConfigOrDie
+  , validateConfig
+  , getNetworkId
+  , getNetworkName
+  , usesBlockfrost
+  , usesCardanoNode
+  , getBlockfrostUrl
+  ) where
 
 import Data.Aeson
 import Data.Text (Text)
@@ -10,6 +26,7 @@ import qualified Data.Text.IO as TIO
 import qualified Data.ByteString.Lazy as BL
 import System.Exit (exitFailure)
 import System.IO (hPutStrLn, stderr)
+import Control.Exception (catch, try)
 import GHC.Generics
 
 -- ============================================================================
@@ -53,7 +70,6 @@ data NetworkMode = Testnet | Mainnet
 instance FromJSON NetworkMode where
   parseJSON (String "testnet") = pure Testnet
   parseJSON (String "mainnet") = pure Mainnet
-  parseJSON (String "testnet") = pure Testnet
   parseJSON _ = fail "network must be 'testnet' or 'mainnet'"
 
 instance ToJSON NetworkMode where
@@ -108,18 +124,13 @@ defaultConfig = Config
 -- | Load configuration from JSON file
 loadConfig :: FilePath -> IO (Either String Config)
 loadConfig configFile = do
-  result <- try $ BL.readFile configFile
+  result <- try @IOError $ BL.readFile configFile
   case result of
-    Left (err :: IOError) -> do
-      return $ Left $ "Failed to read config file: " ++ show err
-    Right content -> do
+    Left err -> return $ Left $ "Failed to read config file: " ++ show err
+    Right content ->
       case eitherDecode content of
         Left err -> return $ Left $ "Failed to parse config: " ++ err
         Right cfg -> return $ Right cfg
-  where
-    try action = do
-      result <- catch (Right <$> action) (\(e :: IOError) -> return (Left e))
-      return result
 
 -- | Load configuration and exit on error
 loadConfigOrDie :: FilePath -> IO Config

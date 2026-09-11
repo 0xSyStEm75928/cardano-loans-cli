@@ -1,13 +1,11 @@
-module Main where
+{-# LANGUAGE OverloadedStrings #-}
 
-import Options.Applicative
-import Relude
+module Main (main) where
 
-import CLI.Parsers
-import CLI.Run
+import CLI.Parser (parseCommand)
+import CLI.Runner (runCommand)
 
 main :: IO ()
 main = do
-  let preferences = prefs $ showHelpOnError <> showHelpOnEmpty
-      opts = info (parseCommand <**> helper) (fullDesc <> progDesc "A p2p lending/borrower protocol")
-  customExecParser preferences opts >>= runCommand
+  cmd <- parseCommand
+  runCommand cmd

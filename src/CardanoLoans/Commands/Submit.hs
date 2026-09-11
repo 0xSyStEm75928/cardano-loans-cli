@@ -1,20 +1,21 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveGeneric #-}
 
-module CardanoLoans.Standalone.Commands.Submit where
+module CardanoLoans.Commands.Submit
+  ( executeSubmit
+  , SubmitPhaseInput(..)
+  , SubmitPhaseOutput(..)
+  ) where
 
-import Data.Aeson
+import Data.Aeson (Value(..), object, (.=))
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import qualified Data.ByteString.Char8 as BS
-import System.Process
-import System.Exit
 import System.Environment (getEnv)
 import Control.Exception (catch, SomeException)
-import GHC.Generics
-import CardanoLoans.Standalone.Types
-import CardanoLoans.Standalone.Config
+import CardanoLoans.Types
+import CardanoLoans.Config
 
 -- ============================================================================
 -- Submit Command Implementation

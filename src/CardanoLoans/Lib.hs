@@ -1,9 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 
--- | CardanoLoans: Standalone CLI for Cardano peer-to-peer lending.
---
--- Re-exports all public modules for convenient import.
-module CardanoLoans
+-- | CardanoLoans.Lib
+-- Re-exports the standalone CLI library modules for the cardano-loans-standalone package.
+module CardanoLoans.Lib
   ( -- * Types
     module CardanoLoans.Types
     -- * Configuration
@@ -12,7 +11,6 @@ module CardanoLoans
   , module CardanoLoans.Commands.Build
   , module CardanoLoans.Commands.Sign
   , module CardanoLoans.Commands.Submit
-  , module CardanoLoans.Commands.Status
   ) where
 
 import CardanoLoans.Types
@@ -20,4 +18,3 @@ import CardanoLoans.Config
 import CardanoLoans.Commands.Build
 import CardanoLoans.Commands.Sign
 import CardanoLoans.Commands.Submit
-import CardanoLoans.Commands.Status

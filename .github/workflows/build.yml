@@ -1,0 +1,87 @@
+name: Build Cardano Loans CLI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: GHC ${{ matrix.ghc }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        ghc: ['9.6.6', '9.8.4']
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Haskell
+        id: setup
+        uses: haskell-actions/setup@v2
+        with:
+          ghc-version: ${{ matrix.ghc }}
+          cabal-version: '3.12'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            libgmp-dev \
+            libffi-dev \
+            zlib1g-dev \
+            pkg-config
+
+      - name: Restore cached dependencies
+        uses: actions/cache/restore@v4
+        id: cache
+        with:
+          path: ${{ steps.setup.outputs.cabal-store }}
+          restore-keys: |
+            ${{ runner.os }}-ghc-${{ steps.setup.outputs.ghc-version }}
+          key: |
+            ${{ runner.os }}-ghc-${{ steps.setup.outputs.ghc-version }}-${{ hashFiles('cardano-loans-standalone.cabal') }}
+
+      - name: Install dependencies
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          cabal update
+          cabal build all --project-file=cardano-loans-standalone.cabal --only-dependencies
+
+      - name: Save dependency cache
+        uses: actions/cache/save@v4
+        if: steps.cache.outputs.cache-hit != 'true'
+        with:
+          path: ${{ steps.setup.outputs.cabal-store }}
+          key: ${{ steps.cache.outputs.cache-primary-key }}
+
+      - name: Build library
+        run: cabal build lib:cardano-loans-standalone --project-file=cardano-loans-standalone.cabal
+
+      - name: Build executable
+        run: cabal build exe:cardano-loans --project-file=cardano-loans-standalone.cabal
+
+      - name: Check cabal file
+        run: cabal check --project-file=cardano-loans-standalone.cabal
+
+      - name: Verify binary
+        run: |
+          BIN="$(cabal list-bin exe:cardano-loans --project-file=cardano-loans-standalone.cabal)"
+          test -x "$BIN"
+          "$BIN" --help || true
+
+      - name: Upload artifact
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cardano-loans-cli-ghc${{ matrix.ghc }}
+          path: ${{ github.workspace }}/dist-newstyle/**/cardano-loans
+          if-no-files-found: warn
