@@ -1,4 +1,4 @@
-name: Build Cardano Loans CLI
+name: Build ZER EVM CLI
 
 on:
   push:
@@ -12,76 +12,91 @@ permissions:
 
 jobs:
   build:
-    name: GHC ${{ matrix.ghc }}
+    name: Node ${{ matrix.node }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        ghc: ['9.6.6', '9.8.4']
+        node: ['18', '20', '22']
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Haskell
-        id: setup
-        uses: haskell-actions/setup@v2
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          ghc-version: ${{ matrix.ghc }}
-          cabal-version: '3.12'
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            build-essential \
-            libgmp-dev \
-            libffi-dev \
-            zlib1g-dev \
-            pkg-config
-
-      - name: Restore cached dependencies
-        uses: actions/cache/restore@v4
-        id: cache
-        with:
-          path: ${{ steps.setup.outputs.cabal-store }}
-          restore-keys: |
-            ${{ runner.os }}-ghc-${{ steps.setup.outputs.ghc-version }}
-          key: |
-            ${{ runner.os }}-ghc-${{ steps.setup.outputs.ghc-version }}-${{ hashFiles('cabal.project', 'cardano-loans-standalone.cabal') }}
+          node-version: ${{ matrix.node }}
+          cache: 'npm'
+          cache-dependency-path: evm-cli/package-lock.json
 
       - name: Install dependencies
-        if: steps.cache.outputs.cache-hit != 'true'
+        working-directory: evm-cli
+        run: npm ci
+
+      - name: Compile contracts
+        working-directory: evm-cli
+        run: npm run compile
+
+      - name: Build TypeScript
+        working-directory: evm-cli
+        run: npm run build
+
+      - name: Run tests
+        working-directory: evm-cli
+        run: npm test
+
+      - name: Verify CLI
+        working-directory: evm-cli
         run: |
-          cabal update
-          cabal build all --project-file=cabal.project --only-dependencies
-
-      - name: Save dependency cache
-        uses: actions/cache/save@v4
-        if: steps.cache.outputs.cache-hit != 'true'
-        with:
-          path: ${{ steps.setup.outputs.cabal-store }}
-          key: ${{ steps.cache.outputs.cache-primary-key }}
-
-      - name: Build library
-        run: cabal build lib:cardano-loans-standalone --project-file=cabal.project
-
-      - name: Build executable
-        run: cabal build exe:cardano-loans --project-file=cabal.project
-
-      - name: Check cabal file
-        run: cabal check --project-file=cabal.project
-
-      - name: Verify binary
-        run: |
-          BIN="$(cabal list-bin exe:cardano-loans --project-file=cabal.project)"
-          test -x "$BIN"
-          "$BIN" --help || true
+          npx tsx src/cli.ts --version
+          npx tsx src/cli.ts --help
 
       - name: Upload artifact
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
         uses: actions/upload-artifact@v4
         with:
-          name: cardano-loans-cli-ghc${{ matrix.ghc }}
-          path: ${{ github.workspace }}/dist-newstyle/**/cardano-loans
+          name: zer-evm-cli-node${{ matrix.node }}
+          path: |
+            evm-cli/dist/
+            evm-cli/artifacts/
+            evm-cli/typechain-types/
           if-no-files-found: warn
+
+  solidity:
+    name: Solidity ${{ matrix.solc }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        solc: ['0.8.24']
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: evm-cli/package-lock.json
+
+      - name: Install dependencies
+        working-directory: evm-cli
+        run: npm ci
+
+      - name: Compile contracts
+        working-directory: evm-cli
+        run: npm run compile
+
+      - name: Run contract tests
+        working-directory: evm-cli
+        run: npx hardhat test
+
+      - name: Gas report
+        if: matrix.solc == '0.8.24'
+        working-directory: evm-cli
+        run: REPORT_GAS=true npx hardhat test
+        env:
+          REPORT_GAS: true
