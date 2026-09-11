@@ -82,7 +82,7 @@ submitToMainnet input txHex cfg = do
         Right txId -> return $ Right SubmitPhaseOutput
           { spoTxId = txId
           , spoNetworkId = "mainnet"
-          , spoStatus = "submitted"
+          , spoSubmitStatus = "submitted"
           , spoConfirmationUrl = generateExplorerUrl "mainnet" txId
           }
 
@@ -107,7 +107,7 @@ submitToTestnet input txHex cfg = do
         Right txId -> return $ Right SubmitPhaseOutput
           { spoTxId = txId
           , spoNetworkId = "testnet"
-          , spoStatus = "submitted"
+          , spoSubmitStatus = "submitted"
           , spoConfirmationUrl = generateExplorerUrl "testnet" txId
           }
 
@@ -132,7 +132,7 @@ submitToPreview input txHex cfg = do
         Right txId -> return $ Right SubmitPhaseOutput
           { spoTxId = txId
           , spoNetworkId = "preview"
-          , spoStatus = "submitted"
+          , spoSubmitStatus = "submitted"
           , spoConfirmationUrl = generateExplorerUrl "preview" txId
           }
 
@@ -190,7 +190,7 @@ formatSubmitOutput output = object
   , "status" .= String "success"
   , "txId" .= spoTxId output
   , "network" .= spoNetworkId output
-  , "submitted" .= spoStatus output
+  , "submitted" .= spoSubmitStatus output
   , "explorerUrl" .= spoConfirmationUrl output
   ]
 

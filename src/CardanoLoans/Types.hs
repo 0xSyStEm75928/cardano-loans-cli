@@ -202,7 +202,7 @@ data SubmitPhaseInput = SubmitPhaseInput
 data SubmitPhaseOutput = SubmitPhaseOutput
   { spoTxId :: Text             -- ^ Transaction ID after submission
   , spoNetworkId :: Text        -- ^ Network the tx was submitted to
-  , spoStatus :: Text           -- ^ Submission status
+  , spoSubmitStatus :: Text     -- ^ Submission status
   , spoConfirmationUrl :: Text  -- ^ URL to view the transaction on an explorer
   } deriving (Show, Generic)
 
@@ -210,7 +210,7 @@ instance ToJSON SubmitPhaseOutput where
   toJSON SubmitPhaseOutput{..} = object
     [ "txid" .= spoTxId
     , "network" .= spoNetworkId
-    , "status" .= spoStatus
+    , "status" .= spoSubmitStatus
     , "explorer_url" .= spoConfirmationUrl
     ]
 

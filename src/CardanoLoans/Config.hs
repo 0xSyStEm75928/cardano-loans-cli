@@ -21,12 +21,10 @@ module CardanoLoans.Config
 
 import Data.Aeson
 import Data.Text (Text)
-import qualified Data.Text as T
-import qualified Data.Text.IO as TIO
 import qualified Data.ByteString.Lazy as BL
 import System.Exit (exitFailure)
 import System.IO (hPutStrLn, stderr)
-import Control.Exception (catch, try)
+import Control.Exception (try)
 import GHC.Generics
 
 -- ============================================================================
