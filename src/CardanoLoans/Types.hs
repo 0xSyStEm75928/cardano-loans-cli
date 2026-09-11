@@ -29,7 +29,7 @@ module CardanoLoans.Types
   , LoanError(..)
   ) where
 
-import Data.Aeson
+import Data.Aeson hiding (Success, Error)
 import Data.Text (Text)
 import GHC.Generics
 import Data.Maybe (catMaybes)
