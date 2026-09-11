@@ -6,6 +6,7 @@ module CardanoLoans.Commands.Status
   ( executeStatus
   ) where
 
+import Data.Text (Text)
 import System.Environment (getEnv)
 import Control.Exception (catch, SomeException)
 import CardanoLoans.Types
