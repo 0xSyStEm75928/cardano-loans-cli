@@ -1,7 +1,20 @@
 import { ethers } from 'ethers';
-import { loadConfig } from './config.js';
-import LoanArtifact from '../artifacts/contracts/Loan.sol/Loan.json' assert { type: 'json' };
-import BeaconArtifact from '../artifacts/contracts/BeaconNFT.sol/BeaconNFT.json' assert { type: 'json' };
+import * as fs from 'fs';
+import * as path from 'path';
+import { loadConfig } from './config';
+
+// Load compiled contract ABIs from Hardhat artifacts at runtime
+function loadArtifact(contractName: string): { abi: any } {
+  const artifactPath = path.join(
+    __dirname,
+    '..',
+    'artifacts',
+    'contracts',
+    `${contractName}.sol`,
+    `${contractName}.json`
+  );
+  return JSON.parse(fs.readFileSync(artifactPath, 'utf-8'));
+}
 
 export interface Ask {
   borrower: string;
@@ -91,8 +104,8 @@ export class LoanClient {
   constructor(provider: ethers.Provider, signer: ethers.Signer, config: any) {
     this.provider = provider;
     this.signer = signer;
-    this.loanContract = new ethers.Contract(config.loanAddress, LoanArtifact.abi, signer);
-    this.beaconContract = new ethers.Contract(config.beaconAddress, BeaconArtifact.abi, signer);
+    this.loanContract = new ethers.Contract(config.loanAddress, loadArtifact('Loan').abi, signer);
+    this.beaconContract = new ethers.Contract(config.beaconAddress, loadArtifact('BeaconNFT').abi, signer);
   }
 
   static async fromEnv(): Promise<LoanClient> {

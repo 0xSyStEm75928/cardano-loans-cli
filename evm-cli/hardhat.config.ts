@@ -1,4 +1,4 @@
-import { HardhatUserConfig } from "hardhat/config";
+import { HardhatUserConfig } from "hardhat/types";
 import "@nomicfoundation/hardhat-toolbox";
 import "dotenv/config";
 

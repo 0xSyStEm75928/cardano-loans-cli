@@ -23,6 +23,7 @@ contract BeaconNFT {
     mapping(uint256 => address) public tokenOwner;
     mapping(uint256 => string) public tokenURI;
     mapping(address => uint256[]) public tokensOf;
+    mapping(address => bool) public minters;
     
     event Transfer(address indexed from, address indexed to, uint256 indexed tokenId);
     event BeaconMinted(uint256 indexed tokenId, TokenType tokenType, address indexed to);
@@ -32,9 +33,21 @@ contract BeaconNFT {
         require(msg.sender == owner, "Not owner");
         _;
     }
+
+    modifier onlyMinter() {
+        require(minters[msg.sender], "Not minter");
+        _;
+    }
     
     constructor() {
         owner = msg.sender;
+        minters[msg.sender] = true;
+    }
+    
+    /// @notice Authorize a contract (e.g. Loan) to mint/burn beacons
+    function setMinter(address minter) external onlyOwner {
+        require(minters[msg.sender], "Not owner");
+        minters[minter] = true;
     }
     
     function balanceOf(address account) public view returns (uint256) {
@@ -46,50 +59,52 @@ contract BeaconNFT {
         return tokenOwner[tokenId];
     }
     
-    function mintBorrowerId(address to, uint256 linkedId) external onlyOwner returns (uint256) {
+    function mintBorrowerId(address to, uint256 linkedId) external onlyMinter returns (uint256) {
         uint256 tokenId = _tokenIdCounter++;
         _mint(to, tokenId, TokenType.BorrowerId, linkedId);
         return tokenId;
     }
     
-    function mintLenderId(address to, uint256 linkedId) external onlyOwner returns (uint256) {
+    function mintLenderId(address to, uint256 linkedId) external onlyMinter returns (uint256) {
         uint256 tokenId = _tokenIdCounter++;
         _mint(to, tokenId, TokenType.LenderId, linkedId);
         return tokenId;
     }
     
-    function mintLoanId(uint256 loanId, address borrower, address lender) external onlyOwner returns (uint256) {
+    function mintLoanId(uint256 loanId, address borrower, address lender) external onlyMinter returns (uint256) {
         uint256 tokenId = _tokenIdCounter++;
         _mint(lender, tokenId, TokenType.LoanId, loanId);
         return tokenId;
     }
     
-    function borrowerBeacon(address minter, uint256 linkedId) external onlyOwner {
+    function borrowerBeacon(address minter, uint256 linkedId) external onlyMinter {
         _burnByLinkedId(minter, TokenType.BorrowerId, linkedId);
     }
     
-    function lenderBeacon(address minter, uint256 linkedId) external onlyOwner {
+    function lenderBeacon(address minter, uint256 linkedId) external onlyMinter {
         _burnByLinkedId(minter, TokenType.LenderId, linkedId);
     }
     
-    function burnLoanId(uint256 loanId) external onlyOwner {
+    function burnLoanId(uint256 loanId) external onlyMinter {
         uint256[] storage tokens = tokensOf[address(this)];
-        for (uint256 i = 0; i < tokens.length; i++) {
-            if (tokenInfo[tokens[i]].linkedId == loanId && tokenInfo[tokens[i]].active) {
-                _burn(tokens[i]);
-                i--;
+        // Iterate backwards: _burn swap-and-pops, moving an already-checked element into the slot
+        for (uint256 i = tokens.length; i > 0; i--) {
+            uint256 tokenId = tokens[i - 1];
+            if (tokenInfo[tokenId].linkedId == loanId && tokenInfo[tokenId].active) {
+                _burn(tokenId);
             }
         }
     }
     
-    function burnForUnlock(uint256 loanId, address minter) external onlyOwner {
+    function burnForUnlock(uint256 loanId, address minter) external onlyMinter {
         uint256[] storage tokens = tokensOf[minter];
-        for (uint256 i = 0; i < tokens.length; i++) {
-            if (tokenInfo[tokens[i]].linkedId == loanId && 
-                tokenInfo[tokens[i]].tokenType != TokenType.LoanId &&
-                tokenInfo[tokens[i]].active) {
-                _burn(tokens[i]);
-                i--;
+        // Iterate backwards: _burn swap-and-pops, moving an already-checked element into the slot
+        for (uint256 i = tokens.length; i > 0; i--) {
+            uint256 tokenId = tokens[i - 1];
+            if (tokenInfo[tokenId].linkedId == loanId && 
+                tokenInfo[tokenId].tokenType != TokenType.LoanId &&
+                tokenInfo[tokenId].active) {
+                _burn(tokenId);
             }
         }
     }
@@ -132,7 +147,6 @@ contract BeaconNFT {
                 tokenInfo[arr[i]].tokenType == tokenType &&
                 tokenInfo[arr[i]].active) {
                 _burn(arr[i]);
-                i--;
                 break;
             }
         }

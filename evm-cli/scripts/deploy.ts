@@ -1,4 +1,4 @@
-import { ethers } from 'hardhat';
+import { ethers, run } from 'hardhat';
 import * as fs from 'fs';
 import * as path from 'path';
 

@@ -20,6 +20,9 @@ describe("Loan", function () {
     const Loan = await ethers.getContractFactory("Loan");
     loan = await Loan.deploy(await beaconNFT.getAddress());
     await loan.waitForDeployment();
+
+    // Authorize Loan contract to mint/burn beacons
+    await beaconNFT.setMinter(await loan.getAddress());
   });
 
   describe("Ask", function () {
