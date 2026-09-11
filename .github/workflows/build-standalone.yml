@@ -41,7 +41,7 @@ jobs:
           cabal build all --project-file=cabal.project
 
       - name: Check cabal file
-        run: cabal check cardano-loans-standalone.cabal
+        run: cabal check
 
       - name: Verify binary
         run: |
